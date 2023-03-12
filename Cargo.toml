@@ -3,7 +3,7 @@ name = "graffy"
 version = "0.1.0"
 edition = "2021"
 
-license = "MIT or Apache-2.0"
+license = "MIT OR Apache-2.0"
 description = "A graphing library that aims to be both simple to use and powerful."
 readme = "README.md"
 homepage = "https://github.com/lunir-project/graffy"
