@@ -12,3 +12,4 @@ repository = "https://github.com/lunir-project/graffy"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+slotmap = "1.0.6"
