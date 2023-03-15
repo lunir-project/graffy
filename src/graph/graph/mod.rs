@@ -1,6 +1,6 @@
 mod tests;
 
-use std::{iter::Cycle, marker::PhantomData, collections::HashSet};
+use std::{collections::HashSet, iter::Cycle, marker::PhantomData};
 
 #[derive(Debug)]
 pub enum Cyclic {}
@@ -95,6 +95,35 @@ pub struct Graph<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> {
 }
 
 impl<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> Graph<V, E, D, C> {
+    pub fn cycles(&self) -> bool {
+        todo!();
+        let mut visited: HashSet<usize> = HashSet::new();
+        let mut idx = 0;
+
+        loop {
+            for edge in self.vertices[idx].edges {
+                let target = &self.edges[edge].vertices[0];
+
+                visited.insert(*target);
+
+                if visited.get(target).is_some() {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn insert_edge(
+        &mut self,
+        source: usize,
+        destination: usize,
+        weight: E,
+    ) -> Result<usize, CycleError> {
+        C::insert_edge(self, Edge::new(source, destination, weight))
+    }
+
     fn insert_edge_unchecked(&mut self, edge: Edge<E, V>) -> usize {
         let index = self.edges.len();
         let (from, to) = edge.vertex_indices();
@@ -120,15 +149,6 @@ impl<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> Graph<V, E, D, C> {
         index
     }
 
-    pub fn insert_edge(
-        &mut self,
-        source: usize,
-        destination: usize,
-        weight: E,
-    ) -> Result<usize, CycleError> {
-        C::insert_edge(self, Edge::new(source, destination, weight))
-    }
-
     pub fn insert_vertex(&mut self, weight: V) -> usize {
         self.vertices.push(Vertex {
             weight,
@@ -141,24 +161,6 @@ impl<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> Graph<V, E, D, C> {
     pub fn remove_edge(&mut self, index: usize) {
         self.edges.swap_remove(index);
         // in rust u cant overload the [] operator?
-    }
-
-    pub fn cycles(&self) -> bool {
-        todo!()
-        // let mut visited: HashSet<usize> = HashSet::new();
-        // visited.insert(0_usize);
-        // let mut ind = 0_usize;
-        // while !visited.is_empty() {
-        //     let v = visited.get(&ind);
-        //     visited.remove(&ind);
-        //     ind += 1;
-        //     if visited.
-        //     for vertex in &self.vertices {
-
-        //     }
-        // }
-
-        // false
     }
 
     fn would_cycle_with_edge(&mut self, edge: Edge<E, V>) -> bool {
