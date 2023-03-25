@@ -15,12 +15,9 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Dft<'g, V, E, C> {
         let mut visited = HashSet::new();
         let mut pending_checks = vec![];
 
-        // here we're pushing the first source vertex of the entire graph to both
-        // visited and pending. :thumbsup:
         visited.insert(self.edges[0].vertices[0]);
         pending_checks.push(self.edges[0].vertices[0]);
 
-        // here we check if pending is empty, obviously it isn't so we continue :thumbsup:
         while !pending_checks.is_empty() {
             let vertex = pending_checks.pop().unwrap();
 
@@ -33,13 +30,6 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Dft<'g, V, E, C> {
                     .edges
                     .iter()
                     .any(|&e| e != *edge && self.edges[e].vertices[1] == adjacent)
-                // ok im either a genius or dumb. it's working, no more cycle error
-                // it is cycling tho?
-                // no, same code that u had written
-                //
-                // brother below we go from 4 -> 1
-                // once we hook up 3 then the cycle is completed
-                // hang on i cant compile
                 {
                     return true;
                 }
@@ -99,41 +89,35 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Iterator for Dft<'g, V, E, C> {
     type Item = &'g Vertex<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        //if C::is_cyclic() {} // use this foe what
-        // knowing if you should keep looping in a cycle or not
-
-        if self.counter >= self.vertices.len() {
+        if self.counter >= self.vertices.len() + 1  {
             return None;
         }
 
-        println!("Counter: {}", self.counter);
-        self.counter += 1;
-        // if this is the first iteration, return the first vertex
-        if self.counter - 1 == 0 {
-            return Some(&self.vertices[self.edges[self.counter - 1].vertices[0]]);
-        } else if self.counter - 1 == 1 {
-            // since the second edge will have the third vertex as the destination
-            // we need to check if we are on the second iteration and return the second vertex.
-            return Some(&self.vertices[self.edges[self.counter - 2].vertices[1]]);
+        if self.counter == 0 {
+            let first_vertex = self.edges[self.counter].vertices[0];
+            self.visited_vertices.insert(first_vertex);
+
+            self.counter += 1;
+            return Some(&self.vertices[first_vertex]);
+        } else if self.counter == 1 {
+            let second_vertex = self.edges[self.counter - 1].vertices[1];
+            self.visited_vertices.insert(second_vertex);
+
+            self.counter += 1;
+            return Some(&self.vertices[second_vertex]);
         }
-        // here we just need to go destination to destination to destination one after the other
-        // i managed to do it, but sadly if it's cyclic, it will output the destination even though
-        // it has already been outputted previously (side effect of having a cyclic graph)
-        // so we need to fix that behavior and check for any other possible edge cases.
-        // good?
-        let current_edge = &self.edges[self.counter - 2];
+
+        let current_edge = &self.edges[self.counter - 1];
         let destination_vertex = current_edge.vertices[1];
 
+        self.counter += 1;
         if !C::is_cyclic() {
             if !self.visited_vertices.insert(destination_vertex) {
                 return None;
             }
         }
 
-        println!(
-            "destination: {destination_vertex}, counter: {}",
-            self.counter - 2
-        );
+        self.visited_vertices.insert(destination_vertex);
         Some(&self.vertices[destination_vertex])
     }
 }
