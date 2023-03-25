@@ -48,6 +48,11 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Dft<'g, V, E, C> {
 
         false
     }
+
+    #[inline]
+    pub fn new<D: EdgeType>(from: &'g Graph<V, E, D, C>) -> Self {
+        Self::from(from)
+    }
 }
 
 impl<'g, V: Clone, E: Clone, D: EdgeType, C: Cyclicness> From<&'g Graph<V, E, D, C>>
