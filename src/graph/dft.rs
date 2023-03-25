@@ -1,4 +1,4 @@
-use super::graph::{Acyclic, Cyclicness, Edge, EdgeType, Graph, Vertex};
+use super::graph::{Acyclic, Cyclic, Cyclicness, Edge, EdgeType, Graph, Vertex};
 use std::{collections::HashSet, marker::PhantomData};
 
 pub struct Dft<'g, V: Clone, E: Clone, C: Cyclicness> {
@@ -51,9 +51,33 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Dft<'g, V, E, C> {
 }
 
 impl<'g, V: Clone, E: Clone, D: EdgeType, C: Cyclicness> From<&'g Graph<V, E, D, C>>
-    for Dft<'g, V, E, Acyclic>
+    for Dft<'g, V, E, C>
 {
     fn from(from: &'g Graph<V, E, D, C>) -> Self {
+        Dft {
+            vertices: &from.vertices.as_slice(),
+            visited_vertices: HashSet::new(),
+            edges: &from.edges,
+            counter: 0,
+            _cyclic: PhantomData,
+        }
+    }
+}
+
+impl<'g, V: Clone, E: Clone> Dft<'g, V, E, Cyclic> {
+    fn new_cyclic<D: EdgeType, C: Cyclicness>(from: &'g Graph<V, E, D, C>) -> Self {
+        Dft {
+            vertices: &from.vertices.as_slice(),
+            visited_vertices: HashSet::new(),
+            edges: &from.edges,
+            counter: 0,
+            _cyclic: PhantomData,
+        }
+    }
+}
+
+impl<'g, V: Clone, E: Clone> Dft<'g, V, E, Acyclic> {
+    fn new_acyclic<D: EdgeType, C: Cyclicness>(from: &'g Graph<V, E, D, C>) -> Self {
         Dft {
             vertices: &from.vertices.as_slice(),
             visited_vertices: HashSet::new(),
@@ -82,7 +106,7 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Iterator for Dft<'g, V, E, C> {
         // if this is the first iteration, return the first vertex
         if self.counter - 1 == 0 {
             return Some(&self.vertices[self.edges[self.counter - 1].vertices[0]]);
-        } else if self.counter - 1 == 1 { 
+        } else if self.counter - 1 == 1 {
             // since the second edge will have the third vertex as the destination
             // we need to check if we are on the second iteration and return the second vertex.
             return Some(&self.vertices[self.edges[self.counter - 2].vertices[1]]);
@@ -94,6 +118,12 @@ impl<'g, V: Clone, E: Clone, C: Cyclicness> Iterator for Dft<'g, V, E, C> {
         // good?
         let current_edge = &self.edges[self.counter - 2];
         let destination_vertex = current_edge.vertices[1];
+
+        if !C::is_cyclic() {
+            if !self.visited_vertices.insert(destination_vertex) {
+                return None;
+            }
+        }
 
         println!(
             "destination: {destination_vertex}, counter: {}",
