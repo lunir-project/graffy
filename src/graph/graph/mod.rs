@@ -1,52 +1,57 @@
 mod tests;
 
-use std::{collections::HashSet, iter::Cycle, marker::PhantomData};
-
-#[derive(Debug)]
+use super::dft::*;
+use std::{collections::HashSet, marker::PhantomData};
+#[derive(Clone, Debug)]
 pub enum Cyclic {}
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Acyclic {}
 
+#[derive(Debug)]
 pub struct CycleError;
 
 pub trait Cyclicness: Sized {
     fn insert_edge<V: Clone, E: Clone, D: EdgeType>(
         graph: &mut Graph<V, E, D, Self>,
-        edge: Edge<E, V>,
+        edge: Edge<E>,
     ) -> Result<usize, CycleError>;
+
+    fn is_cyclic() -> bool;
 }
 
 impl Cyclicness for Cyclic {
     fn insert_edge<V: Clone, E: Clone, D: EdgeType>(
         graph: &mut Graph<V, E, D, Self>,
-        edge: Edge<E, V>,
+        edge: Edge<E>,
     ) -> Result<usize, CycleError> {
         Ok(graph.insert_edge_unchecked(edge))
+    }
+
+    fn is_cyclic() -> bool {
+        true
     }
 }
 
 impl Cyclicness for Acyclic {
     fn insert_edge<V: Clone, E: Clone, D: EdgeType>(
         graph: &mut Graph<V, E, D, Self>,
-        edge: Edge<E, V>,
+        edge: Edge<E>,
     ) -> Result<usize, CycleError> {
         if graph.would_cycle_with_edge(edge.clone()) {
             return Err(CycleError);
         }
-
+        // bro no it doesnt wtf r u talking ab
         Ok(graph.insert_edge_unchecked(edge))
+    }
+
+    fn is_cyclic() -> bool {
+        false
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct Vertex<V: Clone> {
-    pub weight: V,
-    pub edges: Vec<usize>,
-}
-
-#[derive(Debug)]
 pub enum Directed {}
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Undirected {}
 
 pub trait EdgeType {
@@ -71,6 +76,7 @@ pub enum Direction {
 }
 
 impl Direction {
+    #[inline]
     pub fn opposite(self) -> Self {
         match self {
             Self::Outgoing => Self::Incoming,
@@ -80,114 +86,19 @@ impl Direction {
 }
 
 #[derive(Clone, Debug)]
-pub struct Edge<E: Clone, V> {
-    pub weight: E,
-    pub vertices: [usize; 2],
-    _phantom: PhantomData<V>,
+pub struct Vertex<V: Clone> {
+    pub weight: V,
+    pub edges: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Graph<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> {
-    vertices: Vec<Vertex<V>>,
-    edges: Vec<Edge<E, V>>,
-    directed: PhantomData<D>,
-    cyclic: PhantomData<C>,
-}
-
-impl<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> Graph<V, E, D, C> {
-    pub fn cycles(&self) -> bool {
-        todo!();
-        let mut visited: HashSet<usize> = HashSet::new();
-        let mut idx = 0;
-
-        loop {
-            for edge in self.vertices[idx].edges {
-                let target = &self.edges[edge].vertices[0];
-
-                visited.insert(*target);
-
-                if visited.get(target).is_some() {
-                    return true;
-                }
-            }
-        }
-
-        false
-    }
-
-    pub fn insert_edge(
-        &mut self,
-        source: usize,
-        destination: usize,
-        weight: E,
-    ) -> Result<usize, CycleError> {
-        C::insert_edge(self, Edge::new(source, destination, weight))
-    }
-
-    fn insert_edge_unchecked(&mut self, edge: Edge<E, V>) -> usize {
-        let index = self.edges.len();
-        let (from, to) = edge.vertex_indices();
-
-        match self.vertices.get_mut(from) {
-            Some(source_vertex) => {
-                source_vertex.associate_edge(index);
-            }
-
-            _ => panic!("Invalid index in edge upon insertion into graph."),
-        };
-
-        match self.vertices.get_mut(to) {
-            Some(target_vertex) => {
-                target_vertex.associate_edge(index);
-            }
-
-            _ => panic!("Invalid index in edge upon insertion into graph."),
-        };
-
-        self.edges.push(edge);
-
-        index
-    }
-
-    pub fn insert_vertex(&mut self, weight: V) -> usize {
-        self.vertices.push(Vertex {
-            weight,
-            edges: vec![],
-        });
-
-        self.vertices.len() - 1
-    }
-
-    pub fn remove_edge(&mut self, index: usize) {
-        self.edges.swap_remove(index);
-        // in rust u cant overload the [] operator?
-    }
-
-    fn would_cycle_with_edge(&mut self, edge: Edge<E, V>) -> bool {
-        self.edges.push(edge);
-
-        let cycles = self.cycles();
-
-        self.edges.pop();
-
-        cycles
-    }
-}
-impl<E: Clone, V> Edge<E, V> {
-    fn new(source: usize, destination: usize, weight: E) -> Edge<E, V> {
-        Edge {
-            weight,
-            vertices: [source, destination],
-            _phantom: PhantomData,
-        }
-    }
-
-    fn vertex_indices(&self) -> (usize, usize) {
-        (self.vertices[0], self.vertices[1])
-    }
+pub struct Edge<E: Clone> {
+    pub weight: E,
+    pub vertices: [usize; 2],
 }
 
 impl<V: Clone> Vertex<V> {
+    #[inline]
     fn new(weight: V) -> Vertex<V> {
         Vertex {
             weight,
@@ -212,44 +123,178 @@ impl<V: Clone> Vertex<V> {
 
         self.edges = v;
     }
+
+    #[inline]
+    pub fn edge_indices(&self) -> &[usize] {
+        &self.edges
+    }
+
+    #[inline]
+    pub fn weight(&self) -> &V {
+        &self.weight
+    }
 }
 
-impl<V: Clone, E: Clone> Graph<V, E, Undirected, Cyclic> {
-    pub fn new_undirected_with_capacity(cap: usize) -> Self {
-        Graph {
-            vertices: Vec::with_capacity(cap),
-            edges: Vec::with_capacity(cap),
-            directed: PhantomData,
-            cyclic: PhantomData,
+impl<E: Clone> Edge<E> {
+    #[inline]
+    fn new(source: usize, destination: usize, weight: E) -> Edge<E> {
+        Edge {
+            weight,
+            vertices: [source, destination],
         }
     }
 
-    pub fn new_undirected() -> Self {
-        Graph {
-            vertices: vec![],
+    fn vertex_indices(&self) -> (usize, usize) {
+        (self.vertices[0], self.vertices[1])
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Graph<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> {
+    pub vertices: Vec<Vertex<V>>,
+    pub edges: Vec<Edge<E>>,
+    _directed: PhantomData<D>,
+    _cyclic: PhantomData<C>,
+}
+
+impl<V: Clone, E: Clone, D: EdgeType, C: Cyclicness> Graph<V, E, D, C> {
+    pub fn cycles(&self) -> bool {
+        Dft::from(self).cycles()
+        // oh my bad ahhhhhhh i see it now, srry. ok let me redo
+        // its ok
+    }
+
+    #[inline]
+    pub fn insert_edge(
+        &mut self,
+        source: usize,
+        destination: usize,
+        weight: E,
+    ) -> Result<usize, CycleError> {
+        C::insert_edge(self, Edge::new(source, destination, weight))
+    }
+
+    fn insert_edge_unchecked(&mut self, edge: Edge<E>) -> usize {
+        let index = self.edges.len();
+        let (from, to) = edge.vertex_indices();
+
+        match self.vertices.get_mut(from) {
+            Some(source_vertex) => {
+                source_vertex.associate_edge(index);
+            }
+
+            _ => panic!("Invalid index in edge upon insertion into graph."),
+        };
+
+        match self.vertices.get_mut(to) {
+            Some(target_vertex) => {
+                target_vertex.associate_edge(index);
+            }
+
+            _ => panic!("Invalid index in edge upon insertion into graph."),
+        };
+
+        self.edges.push(edge);
+
+        index
+    }
+
+    #[inline]
+    pub fn insert_vertex(&mut self, weight: V) -> usize {
+        self.vertices.push(Vertex {
+            weight,
             edges: vec![],
-            directed: PhantomData,
-            cyclic: PhantomData,
-        }
+        });
+        self.vertices.len() - 1
+    }
+
+    #[inline]
+    pub fn remove_edge(&mut self, index: usize) {
+        self.edges.swap_remove(index);
+    }
+
+    #[inline]
+    pub fn vertex_count(&self) -> usize {
+        self.vertices.len()
+    }
+
+    #[inline]
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    fn would_cycle_with_edge(&mut self, edge: Edge<E>) -> bool {
+        self.edges.push(edge.clone());
+
+        let cycles = self.cycles();
+        self.edges.pop();
+
+        cycles
     }
 }
 
 impl<V: Clone, E: Clone> Graph<V, E, Directed, Cyclic> {
+    #[inline]
     pub fn new_directed_with_capacity(cap: usize) -> Self {
         Graph {
             vertices: Vec::with_capacity(cap),
             edges: Vec::with_capacity(cap),
-            directed: PhantomData,
-            cyclic: PhantomData,
+            _directed: PhantomData,
+            _cyclic: PhantomData,
         }
     }
 
+    #[inline]
     pub fn new_directed() -> Self {
         Graph {
             vertices: vec![],
             edges: vec![],
-            directed: PhantomData,
-            cyclic: PhantomData,
+            _directed: PhantomData,
+            _cyclic: PhantomData,
+        }
+    }
+}
+
+impl<V: Clone, E: Clone> Graph<V, E, Directed, Acyclic> {
+    #[inline]
+    pub fn new_directed_with_capacity(cap: usize) -> Self {
+        Graph {
+            vertices: Vec::with_capacity(cap),
+            edges: Vec::with_capacity(cap),
+            _directed: PhantomData,
+            _cyclic: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn new_directed() -> Self {
+        Graph {
+            vertices: vec![],
+            edges: vec![],
+            _directed: PhantomData,
+            _cyclic: PhantomData,
+        }
+    }
+}
+
+impl<V: Clone, E: Clone> Graph<V, E, Undirected, Cyclic> {
+    #[inline]
+    pub fn new_undirected_with_capacity(cap: usize) -> Self {
+        Graph {
+            vertices: Vec::with_capacity(cap),
+            edges: Vec::with_capacity(cap),
+            _directed: PhantomData,
+            _cyclic: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn new_undirected() -> Self {
+        Graph {
+            vertices: vec![],
+            edges: vec![],
+            _directed: PhantomData,
+            _cyclic: PhantomData,
         }
     }
 }
