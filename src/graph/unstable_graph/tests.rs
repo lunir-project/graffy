@@ -5,7 +5,7 @@ use crate::graph::unstable_graph::dft::Dft;
 
 #[test]
 fn create_graph() {
-    let mut graph = UnstableGraph::<usize, usize, Directed, Cyclic>::new_directed();
+    let mut graph = UnstableGraph::<usize, usize, Directed, Cyclic>::directed();
 
     let v1 = graph.insert_vertex(10);
     let v2 = graph.insert_vertex(20);
