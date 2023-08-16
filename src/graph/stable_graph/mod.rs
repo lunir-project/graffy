@@ -12,7 +12,7 @@ pub enum Cyclic {}
 pub enum Acyclic {}
 
 #[derive(Debug)]
-struct InvalidKey;
+pub struct InvalidKey;
 
 pub trait Cyclicness: Sized {
     fn insert_edge<V: Clone, E: Clone, D: EdgeType>(
