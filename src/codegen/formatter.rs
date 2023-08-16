@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use super::*;
 
+/// You can choose to output Beautified (Pretty) or Minified code from a Formatter.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum FormatterSettings {
     /// Pretty print with indentation and new lines
@@ -12,6 +13,7 @@ pub enum FormatterSettings {
     Minified,
 }
 
+/// Formatter that visits DOT tree nodes and formats then into a source buffer
 #[derive(Clone, PartialEq, Default)]
 pub struct Formatter {
     buffer: String,
@@ -23,10 +25,12 @@ pub struct Formatter {
 }
 
 impl Formatter {
+    /// Construct a new formatter
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Construct a formatter with special settings
     pub fn with_settings(settings: FormatterSettings) -> Self {
         Self {
             settings,
@@ -34,6 +38,7 @@ impl Formatter {
         }
     }
 
+    /// Consume the formatter and return its buffer
     pub fn source(self) -> String {
         self.buffer
     }
@@ -49,8 +54,9 @@ impl Formatter {
         }
     }
 
-    pub fn visit_statements(&mut self, stmts: &Vec<EdgeKind>) {
-        for stat in stmts {
+    /// Visits a slice of `EdgeKind`s and formats them into the buffer
+    pub fn visit_statements(&mut self, stmts: impl AsRef<[EdgeKind]>) {
+        for stat in stmts.as_ref() {
             self.buffer.push_str(&self.indent());
             self.visit_edge_kind(&stat);
             self.buffer.push_str(self.pretty_or("\n", ""));
