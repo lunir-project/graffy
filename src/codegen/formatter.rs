@@ -53,7 +53,7 @@ impl Formatter {
         for stat in stmts {
             self.buffer.push_str(&self.indent());
             self.visit_edge_kind(&stat);
-            self.buffer.push_str(self.pretty_or("", "\n"));
+            self.buffer.push_str(self.pretty_or("\n", ""));
         }
     }
 
@@ -65,7 +65,7 @@ impl Formatter {
         }
 
         self.buffer
-            .push_str(self.pretty_or(&format!("\n{}}}", self.indent()), "}"));
+            .push_str(self.pretty_or(&format!("{}}}", self.indent()), "}"));
     }
 
     fn visit_node_kind(&mut self, node: &NodeKind) {
@@ -107,7 +107,7 @@ impl Formatter {
 
     fn visit_edge_kind(&mut self, edge: &EdgeKind) {
         match edge {
-            EdgeKind::Node(kind, attrs) => self.visit_node(kind, attrs),
+            EdgeKind::Node(node) => self.visit_node(node),
             EdgeKind::Edge(expr) => self.visit_edge(expr),
             EdgeKind::Comment(text) => self.visit_comment(&text),
             EdgeKind::SubGraph(body) => {
@@ -124,7 +124,7 @@ impl Formatter {
     }
 
     fn visit_edge(&mut self, edge: &Edge) {
-        self.visit_edge_kind(&edge.left);
+        self.visit_node_kind(&edge.left);
 
         let arrow = if let Some(graph) = &self.current_graph {
             if matches!(graph, GraphKind::Directed(..)) {
@@ -138,17 +138,17 @@ impl Formatter {
 
         self.buffer
             .push_str(self.pretty_or(&format!(" {arrow} ",), arrow));
-        self.visit_edge_kind(&edge.right);
+        self.visit_node_kind(&edge.right);
 
         if let Some(attributes) = edge.attributes.as_ref() {
             self.visit_attributes(attributes);
         }
     }
 
-    fn visit_node(&mut self, node_kind: &NodeKind, attributes: &Option<Vec<Attribute>>) {
-        self.visit_node_kind(node_kind);
+    fn visit_node(&mut self, node: &Node) {
+        self.visit_node_kind(&node.kind);
 
-        if let Some(attributes) = attributes {
+        if let Some(attributes) = &node.attributes {
             self.visit_attributes(attributes);
         }
     }
@@ -177,8 +177,6 @@ impl Formatter {
     }
 
     fn visit_attribute(&mut self, attribute: &Attribute) {
-        self.buffer.push_str(&match attribute {
-            Attribute::FontName(name) => format!(r#"fontname="{name}""#),
-        });
+        self.buffer.push_str(&attribute.to_string());
     }
 }
