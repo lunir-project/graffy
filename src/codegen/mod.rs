@@ -100,11 +100,73 @@ impl GraphBuilder {
     }
 }
 
+/// Kinds of shapes
+#[derive(Debug, Clone, PartialEq)]
+pub enum ShapeKind {
+    /// ellipse
+    Ellipse,
+}
+
+impl std::fmt::Display for ShapeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Ellipse => "ellipse",
+            }
+        )
+    }
+}
+
+/// Kinds of colors
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColorKind {
+    /// blue
+    Blue,
+}
+
+impl std::fmt::Display for ColorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Blue => "blue",
+            }
+        )
+    }
+}
+
 /// Attributes for edges
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attribute {
     /// fontname
     FontName(String),
+
+    /// label
+    Label(String),
+
+    /// shape
+    Shape(ShapeKind),
+
+    /// color
+    Color(ColorKind),
+}
+
+impl std::fmt::Display for Attribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::FontName(name) => format!(r#"fontname="{name}""#),
+                Self::Label(label) => format!(r#"label="{label}""#),
+                Self::Shape(kind) => format!("shape={kind}"),
+                Self::Color(kind) => format!("color={kind}"),
+            }
+        )
+    }
 }
 
 /// Builder for multiple attributes
@@ -123,13 +185,63 @@ impl AttributesBuilder {
         self.0.push(Attribute::FontName(f.into()));
         self
     }
+
+    pub fn label(mut self, l: impl Into<String>) -> Self {
+        self.0.push(Attribute::Label(l.into()));
+        self
+    }
+
+    pub fn shape(mut self, shape: impl Into<ShapeKind>) -> Self {
+        self.0.push(Attribute::Shape(shape.into()));
+        self
+    }
+
+    pub fn color(mut self, color: impl Into<ColorKind>) -> Self {
+        self.0.push(Attribute::Color(color.into()));
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Node {
+    kind: NodeKind,
+    attributes: Option<Vec<Attribute>>,
+}
+
+/// Builder for `Node`s
+#[derive(Default)]
+pub struct NodeBuilder {
+    kind: Option<NodeKind>,
+    attributes: Option<Vec<Attribute>>,
+}
+impl_into_underlying!(Node, NodeBuilder);
+
+impl Builder<Node> for NodeBuilder {
+    fn build(self) -> Option<Node> {
+        Some(Node {
+            kind: self.kind?,
+            attributes: self.attributes,
+        })
+    }
+}
+
+impl NodeBuilder {
+    pub fn kind(mut self, kind: impl Into<NodeKind>) -> Self {
+        self.kind = Some(kind.into());
+        self
+    }
+
+    pub fn attributes(mut self, attributes: impl AsRef<[Attribute]>) -> Self {
+        self.attributes = Some(attributes.as_ref().to_vec());
+        self
+    }
 }
 
 /// Kinds of `Edge`s and their data
 #[derive(Debug, Clone, PartialEq)]
 pub enum EdgeKind {
-    /// `Node(name, attributes)` -> `name [attributes]`
-    Node(NodeKind, Option<Vec<Attribute>>),
+    /// `Node(node)` -> `node.kind [node.attributes]`
+    Node(Node),
 
     /// `Edge(edge)` -> `edge.left -> edge.right [edge.attributes]`
     Edge(Box<Edge>),
@@ -182,7 +294,10 @@ impl std::fmt::Display for NodeKind {
 
 impl EdgeKindsBuilder {
     pub fn node(mut self, name: impl Into<NodeKind>, attributes: Option<Vec<Attribute>>) -> Self {
-        self.0.push(EdgeKind::Node(name.into(), attributes));
+        self.0.push(EdgeKind::Node(Node {
+            kind: name.into(),
+            attributes,
+        }));
         self
     }
 
@@ -233,7 +348,7 @@ impl Builder<EdgeKind> for EdgeKindBuilder {
 
 impl EdgeKindBuilder {
     pub fn node(mut self, kind: NodeKind, attributes: Option<Vec<Attribute>>) -> Self {
-        self.0 = Some(EdgeKind::Node(kind, attributes));
+        self.0 = Some(EdgeKind::Node(Node { kind, attributes }));
         self
     }
 
@@ -255,16 +370,16 @@ impl EdgeKindBuilder {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Edge {
-    left: EdgeKind,
-    right: EdgeKind,
+    left: NodeKind,
+    right: NodeKind,
     attributes: Option<Vec<Attribute>>,
 }
 
 /// Builder for `Edge`s
 #[derive(Default)]
 pub struct EdgeBuilder {
-    left: Option<EdgeKind>,
-    right: Option<EdgeKind>,
+    left: Option<NodeKind>,
+    right: Option<NodeKind>,
     attributes: Option<Vec<Attribute>>,
 }
 impl_into_underlying!(Edge, EdgeBuilder);
@@ -280,12 +395,12 @@ impl Builder<Edge> for EdgeBuilder {
 }
 
 impl EdgeBuilder {
-    pub fn left(mut self, left: impl Into<EdgeKind>) -> Self {
+    pub fn left(mut self, left: impl Into<NodeKind>) -> Self {
         self.left = Some(left.into());
         self
     }
 
-    pub fn right(mut self, right: impl Into<EdgeKind>) -> Self {
+    pub fn right(mut self, right: impl Into<NodeKind>) -> Self {
         self.right = Some(right.into());
         self
     }
