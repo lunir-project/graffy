@@ -1,5 +1,7 @@
 mod tests;
 
+pub mod formatter;
+
 /// Builder trait for all builders of `T`
 pub trait Builder<T>: Into<T> + Default {
     /// consume `self` and try to build `T`, may fail
@@ -102,7 +104,7 @@ impl GraphBuilder {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attribute {
     /// fontname
-    FontName(Option<String>),
+    FontName(String),
 }
 
 /// Builder for multiple attributes
@@ -118,7 +120,7 @@ impl Builder<Vec<Attribute>> for AttributesBuilder {
 
 impl AttributesBuilder {
     pub fn font_name(mut self, f: impl Into<String>) -> Self {
-        self.0.push(Attribute::FontName(Some(f.into())));
+        self.0.push(Attribute::FontName(f.into()));
         self
     }
 }
@@ -189,8 +191,8 @@ impl EdgeKindsBuilder {
         self
     }
 
-    pub fn subgraph(mut self, body: &[EdgeKind]) -> Self {
-        self.0.push(EdgeKind::SubGraph(body.to_vec()));
+    pub fn subgraph(mut self, body: impl AsRef<[EdgeKind]>) -> Self {
+        self.0.push(EdgeKind::SubGraph(body.as_ref().to_vec()));
         self
     }
 
@@ -200,13 +202,19 @@ impl EdgeKindsBuilder {
     }
 
     pub fn graph(mut self, graph: impl Into<GraphKind>) -> Self {
-        self.0.push(EdgeKind::Graph(graph.into()));
+        self.0
+            .push(EdgeKind::Graph(GraphKind::Undirected(match graph.into() {
+                GraphKind::Directed(graph) | GraphKind::Undirected(graph) => graph,
+            })));
 
         self
     }
 
     pub fn digraph(mut self, graph: impl Into<GraphKind>) -> Self {
-        self.0.push(EdgeKind::Graph(graph.into()));
+        self.0
+            .push(EdgeKind::Graph(GraphKind::Directed(match graph.into() {
+                GraphKind::Directed(graph) | GraphKind::Undirected(graph) => graph,
+            })));
 
         self
     }
@@ -234,8 +242,8 @@ impl EdgeKindBuilder {
         self
     }
 
-    pub fn subgraph(mut self, body: &[EdgeKind]) -> Self {
-        self.0 = Some(EdgeKind::SubGraph(body.to_vec()));
+    pub fn subgraph(mut self, body: impl AsRef<[EdgeKind]>) -> Self {
+        self.0 = Some(EdgeKind::SubGraph(body.as_ref().to_vec()));
         self
     }
 
