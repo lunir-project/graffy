@@ -1,5 +1,6 @@
 mod tests;
 
+/// Graffy's formatter to turn DOT tree -> DOT source code.
 pub mod formatter;
 
 /// Builder trait for all builders of `T`
@@ -22,7 +23,6 @@ macro_rules! impl_into_underlying {
     };
 }
 
-/// Undirected edge digraph
 #[derive(Debug, Clone, PartialEq)]
 pub struct Graph {
     name: Option<String>,
@@ -31,12 +31,14 @@ pub struct Graph {
     attributes: Vec<Attribute>,
 }
 
+/// Is the Graph a digraph or a graph?
 #[derive(Debug, Clone, PartialEq)]
 pub enum GraphKind {
     Undirected(Graph),
     Directed(Graph),
 }
 
+/// Get a `Graph` from a `GraphKind` (regardless of the graph's direction)
 impl Into<Graph> for GraphKind {
     fn into(self) -> Graph {
         match self {
@@ -45,7 +47,7 @@ impl Into<Graph> for GraphKind {
     }
 }
 
-/// Builder for a directed edge graph
+/// Builder for a `GraphKind`
 #[derive(Default)]
 pub struct GraphBuilder {
     name: Option<String>,
@@ -103,8 +105,17 @@ impl GraphBuilder {
 /// Kinds of shapes
 #[derive(Debug, Clone, PartialEq)]
 pub enum ShapeKind {
-    /// ellipse
+    /// `ellipse`
     Ellipse,
+
+    /// `box`
+    Box,
+
+    /// `circle`
+    Circle,
+
+    /// `diamond`
+    Diamond,
 }
 
 impl std::fmt::Display for ShapeKind {
@@ -114,6 +125,9 @@ impl std::fmt::Display for ShapeKind {
             "{}",
             match self {
                 Self::Ellipse => "ellipse",
+                Self::Box => "box",
+                Self::Circle => "circle",
+                Self::Diamond => "diamond",
             }
         )
     }
@@ -122,7 +136,7 @@ impl std::fmt::Display for ShapeKind {
 /// Kinds of colors
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColorKind {
-    /// blue
+    /// `blue`
     Blue,
 }
 
@@ -138,20 +152,126 @@ impl std::fmt::Display for ColorKind {
     }
 }
 
+/// Kinds of edge styles
+#[derive(Debug, Clone, PartialEq)]
+pub enum StyleKind {
+    Solid,
+    Dotted,
+    Dashed,
+}
+
+impl std::fmt::Display for StyleKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Solid => write!(f, "solid"),
+            Self::Dotted => write!(f, "dotted"),
+            Self::Dashed => write!(f, "dashed"),
+        }
+    }
+}
+
+/// Kinds of edge directions
+#[derive(Debug, Clone, PartialEq)]
+pub enum DirectionKind {
+    /// `forward`
+    Forward,
+
+    /// `back`
+    Back,
+}
+
+impl std::fmt::Display for DirectionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DirectionKind::Forward => write!(f, "forward"),
+            DirectionKind::Back => write!(f, "back"),
+        }
+    }
+}
+
+/// Kinds of graph layouts
+#[derive(Debug, Clone, PartialEq)]
+pub enum RankDirectionKind {
+    /// `TB`: for top-to-bottom
+    TopBottom,
+
+    /// 'LR': for left-to-right
+    LeftRight,
+}
+
+impl std::fmt::Display for RankDirectionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RankDirectionKind::TopBottom => write!(f, "TB"),
+            RankDirectionKind::LeftRight => write!(f, "LR"),
+        }
+    }
+}
+
+/// Kinds of styles for edge curves
+#[derive(Debug, Clone, PartialEq)]
+pub enum CurveStyleKind {
+    /// `true`
+    True,
+
+    /// `false`
+    False,
+
+    /// `ortho`
+    Ortho,
+}
+
+impl std::fmt::Display for CurveStyleKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CurveStyleKind::True => write!(f, "true"),
+            CurveStyleKind::False => write!(f, "false"),
+            CurveStyleKind::Ortho => write!(f, "ortho"),
+        }
+    }
+}
+
 /// Attributes for edges
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attribute {
-    /// fontname
+    /// `fontname`
     FontName(String),
 
-    /// label
+    /// `label`
     Label(String),
 
-    /// shape
+    /// `shape`: Specifies the shape of the node (e.g., `box`, `ellipse`, `circle`, `diamond`, etc.).
     Shape(ShapeKind),
 
-    /// color
+    /// `color`: Sets the color of the nodes border/edge.
     Color(ColorKind),
+
+    /// `fillcolor`: Sets the background color of the node.
+    FillColor(ColorKind),
+
+    /// `tooltip`: Tooltip attached to the node.
+    Tooltip(String),
+
+    /// `URL`: URL attached to the node.
+    URL(String),
+
+    /// `style`: Sets the line style of the edge(s) (e.g., `dotted`, `dashed`, `solid`, etc.).
+    Style(StyleKind),
+
+    /// `dir`: Sets the direction of the edge (i.e. `forward`, `back`, or `none`).
+    Direction(Option<DirectionKind>),
+
+    /// `fontsize`: Sets the font size for the edge's label.
+    FontSize(usize),
+
+    /// `bgcolor`: Sets the background color of the graph.
+    BgColor(ColorKind),
+
+    /// `rankdir`: Sets the direction of graph layout (`TB` for top-bottom, `LR` for left-right, etc).
+    RankDirection(RankDirectionKind),
+
+    /// `splines`: Sets the style of the edge's line.
+    CurveStyle(CurveStyleKind),
 }
 
 impl std::fmt::Display for Attribute {
@@ -164,6 +284,18 @@ impl std::fmt::Display for Attribute {
                 Self::Label(label) => format!(r#"label="{label}""#),
                 Self::Shape(kind) => format!("shape={kind}"),
                 Self::Color(kind) => format!("color={kind}"),
+                Self::FillColor(kind) => format!("fillcolor={kind}"),
+                Self::Tooltip(text) => format!(r#"tooltip="{text}""#),
+                Self::URL(url) => format!(r#"URL="{url}""#),
+                Self::Style(kind) => format!("style={kind}"),
+                Self::Direction(Some(kind)) => format!("dir={kind}"),
+                Self::Direction(None) => format!("dir=none"),
+                Self::FontSize(size) => format!(r#"fontsize="{size}""#),
+                Self::BgColor(color_kind) => format!("bgcolor={color_kind}"),
+                Self::RankDirection(kind) => format!("rankdir={kind}"),
+                Self::CurveStyle(kind) => {
+                    format!("splines={}", kind)
+                }
             }
         )
     }
