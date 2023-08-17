@@ -118,7 +118,12 @@ impl Formatter {
             EdgeKind::Comment(text) => self.visit_comment(&text),
             EdgeKind::SubGraph(body) => {
                 self.buffer.push_str("subgraph");
-                self.visit_block(&body);
+
+                if let Some(name) = &body.name {
+                    self.buffer.push_str(&format!(" {name}"))
+                }
+
+                self.visit_block(&body.body);
             }
             EdgeKind::Graph(graph) => self.visit_graph_kind(graph),
         }
