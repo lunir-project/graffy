@@ -56,10 +56,30 @@ impl Formatter {
 
     /// Visits a slice of `EdgeKind`s and formats them into the buffer
     pub fn visit_statements(&mut self, stmts: impl AsRef<[EdgeKind]>) {
-        for stat in stmts.as_ref() {
-            self.buffer.push_str(&self.indent());
-            self.visit_edge_kind(&stat);
+        let stmts = stmts.as_ref();
+
+        for (i, stat) in stmts.iter().enumerate() {
+            if let FormatterSettings::Pretty = self.settings {
+                self.buffer.push_str(&self.indent());
+            }
+            self.visit_stat_edge_kind(&stat, i == stmts.len() - 1);
+
             self.buffer.push_str(self.pretty_or("\n", ""));
+        }
+    }
+
+    fn visit_stat_edge_kind(&mut self, edge: &EdgeKind, last_stat: bool) {
+        self.visit_edge_kind(edge);
+        match edge {
+            EdgeKind::Node(..) | EdgeKind::Edge(..) if matches!(self.buffer.chars().rev().next().unwrap(), '0'..='9' | 'A'..='Z' | 'a'..='z' | '_') => {
+                if matches!(self.settings, FormatterSettings::Minified)
+                    .then(|| !last_stat)
+                    .unwrap_or_default()
+                {
+                    self.buffer.push(';')
+                }
+            }
+            _ => {}
         }
     }
 
@@ -126,11 +146,6 @@ impl Formatter {
                 self.visit_block(&body.body);
             }
             EdgeKind::Graph(graph) => self.visit_graph_kind(graph),
-        }
-
-        match edge {
-            EdgeKind::Node(..) | EdgeKind::Edge(..) => self.buffer.push(';'),
-            _ => {}
         }
     }
 
