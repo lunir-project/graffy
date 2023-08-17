@@ -1,7 +1,7 @@
 use graffy::codegen::{formatter::*, *};
 
 fn main() {
-    let mut formatter = Formatter::default();
+    let mut formatter = Formatter::with_settings(FormatterSettings::Pretty);
     formatter.visit_statements(
         EdgeKindsBuilder::default().graph(
             GraphKind::builder().name("H").edges(
