@@ -5,11 +5,20 @@ pub mod formatter;
 
 /// Builder trait for all builders of `T`
 pub trait Builder<T>: Into<T> + Default {
-    /// consume `self` and try to build `T`, may fail
+    /// Consume `self` and try to build `T`, may fail
     fn build(self) -> Option<T>;
 }
 
-macro_rules! impl_into_underlying {
+/// Trait that gets the builder for a type
+pub trait Buildable<B: Builder<Self>>
+where
+    Self: Sized,
+{
+    /// Static function that gets a builder for `Self`
+    fn builder() -> B;
+}
+
+macro_rules! impl_builder {
     ($kind: ty, $builder: ty) => {
         impl Into<$kind> for $builder {
             fn into(self) -> $kind {
@@ -18,6 +27,12 @@ macro_rules! impl_into_underlying {
                     std::any::type_name::<$builder>(),
                     std::any::type_name::<$kind>()
                 ))
+            }
+        }
+
+        impl Buildable<$builder> for $kind {
+            fn builder() -> $builder {
+                <$builder>::default()
             }
         }
     };
@@ -56,7 +71,7 @@ pub struct GraphBuilder {
     attributes: Vec<Attribute>,
     is_directed: bool,
 }
-impl_into_underlying!(GraphKind, GraphBuilder);
+impl_builder!(GraphKind, GraphBuilder);
 
 impl Builder<GraphKind> for GraphBuilder {
     fn build(self) -> Option<GraphKind> {
@@ -81,8 +96,8 @@ impl GraphBuilder {
         self
     }
 
-    pub fn edges(mut self, edges: impl AsRef<[EdgeKind]>) -> Self {
-        self.edges = edges.as_ref().to_vec();
+    pub fn edges(mut self, edges: impl Into<Vec<EdgeKind>>) -> Self {
+        self.edges = edges.into();
         self
     }
 
@@ -274,6 +289,12 @@ pub enum Attribute {
     CurveStyle(CurveStyleKind),
 }
 
+impl Into<Vec<Attribute>> for Attribute {
+    fn into(self) -> Vec<Attribute> {
+        vec![self]
+    }
+}
+
 impl std::fmt::Display for Attribute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -304,7 +325,13 @@ impl std::fmt::Display for Attribute {
 /// Builder for multiple attributes
 #[derive(Default)]
 pub struct AttributesBuilder(Vec<Attribute>);
-impl_into_underlying!(Vec<Attribute>, AttributesBuilder);
+impl_builder!(Vec<Attribute>, AttributesBuilder);
+
+impl AsRef<[Attribute]> for AttributesBuilder {
+    fn as_ref(&self) -> &[Attribute] {
+        &self.0
+    }
+}
 
 impl Builder<Vec<Attribute>> for AttributesBuilder {
     fn build(self) -> Option<Vec<Attribute>> {
@@ -346,7 +373,7 @@ pub struct NodeBuilder {
     kind: Option<NodeKind>,
     attributes: Option<Vec<Attribute>>,
 }
-impl_into_underlying!(Node, NodeBuilder);
+impl_builder!(Node, NodeBuilder);
 
 impl Builder<Node> for NodeBuilder {
     fn build(self) -> Option<Node> {
@@ -369,6 +396,42 @@ impl NodeBuilder {
     }
 }
 
+/// Data for a subgraph
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubGraph {
+    name: Option<String>,
+    body: Vec<EdgeKind>,
+}
+
+/// Builder for `SubGraph`
+#[derive(Default)]
+pub struct SubGraphBuilder {
+    name: Option<String>,
+    body: Option<Vec<EdgeKind>>,
+}
+
+impl Builder<SubGraph> for SubGraphBuilder {
+    fn build(self) -> Option<SubGraph> {
+        Some(SubGraph {
+            name: self.name,
+            body: self.body?,
+        })
+    }
+}
+impl_builder!(SubGraph, SubGraphBuilder);
+
+impl SubGraphBuilder {
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn body(mut self, body: impl Into<Vec<EdgeKind>>) -> Self {
+        self.body = Some(body.into());
+        self
+    }
+}
+
 /// Kinds of `Edge`s and their data
 #[derive(Debug, Clone, PartialEq)]
 pub enum EdgeKind {
@@ -379,7 +442,7 @@ pub enum EdgeKind {
     Edge(Box<Edge>),
 
     /// `SubGraph(body)` -> `subgraph { body }`
-    SubGraph(Vec<EdgeKind>),
+    SubGraph(SubGraph),
 
     /// `Comment(text)` -> `// text`
     Comment(String),
@@ -390,7 +453,13 @@ pub enum EdgeKind {
 /// Builder for edge kinds
 #[derive(Default)]
 pub struct EdgeKindsBuilder(Vec<EdgeKind>);
-impl_into_underlying!(Vec<EdgeKind>, EdgeKindsBuilder);
+impl_builder!(Vec<EdgeKind>, EdgeKindsBuilder);
+
+impl AsRef<[EdgeKind]> for EdgeKindsBuilder {
+    fn as_ref(&self) -> &[EdgeKind] {
+        &self.0
+    }
+}
 
 impl Builder<Vec<EdgeKind>> for EdgeKindsBuilder {
     fn build(self) -> Option<Vec<EdgeKind>> {
@@ -409,6 +478,12 @@ pub enum NodeKind {
     Custom(String),
 }
 
+impl<T: AsRef<str>> From<T> for NodeKind {
+    fn from(v: T) -> Self {
+        Self::Custom(v.as_ref().into())
+    }
+}
+
 impl std::fmt::Display for NodeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -418,17 +493,21 @@ impl std::fmt::Display for NodeKind {
                 Self::Graph => "graph",
                 Self::Node => "node",
                 Self::Edge => "edge",
-                Self::Custom(s) => s.as_str(),
+                Self::Custom(s) => &s,
             }
         )
     }
 }
 
 impl EdgeKindsBuilder {
-    pub fn node(mut self, name: impl Into<NodeKind>, attributes: Option<Vec<Attribute>>) -> Self {
+    pub fn node(
+        mut self,
+        name: impl Into<NodeKind>,
+        attributes: impl Into<Vec<Attribute>>,
+    ) -> Self {
         self.0.push(EdgeKind::Node(Node {
             kind: name.into(),
-            attributes,
+            attributes: Some(attributes.into()),
         }));
         self
     }
@@ -438,8 +517,8 @@ impl EdgeKindsBuilder {
         self
     }
 
-    pub fn subgraph(mut self, body: impl AsRef<[EdgeKind]>) -> Self {
-        self.0.push(EdgeKind::SubGraph(body.as_ref().to_vec()));
+    pub fn subgraph(mut self, subgraph: impl Into<SubGraph>) -> Self {
+        self.0.push(EdgeKind::SubGraph(subgraph.into()));
         self
     }
 
@@ -470,7 +549,7 @@ impl EdgeKindsBuilder {
 /// Builder for a singular `EdgeKind`
 #[derive(Default)]
 pub struct EdgeKindBuilder(Option<EdgeKind>);
-impl_into_underlying!(EdgeKind, EdgeKindBuilder);
+impl_builder!(EdgeKind, EdgeKindBuilder);
 
 impl Builder<EdgeKind> for EdgeKindBuilder {
     fn build(self) -> Option<EdgeKind> {
@@ -489,8 +568,8 @@ impl EdgeKindBuilder {
         self
     }
 
-    pub fn subgraph(mut self, body: impl AsRef<[EdgeKind]>) -> Self {
-        self.0 = Some(EdgeKind::SubGraph(body.as_ref().to_vec()));
+    pub fn subgraph(mut self, subgraph: impl Into<SubGraph>) -> Self {
+        self.0 = Some(EdgeKind::SubGraph(subgraph.into()));
         self
     }
 
@@ -514,7 +593,7 @@ pub struct EdgeBuilder {
     right: Option<NodeKind>,
     attributes: Option<Vec<Attribute>>,
 }
-impl_into_underlying!(Edge, EdgeBuilder);
+impl_builder!(Edge, EdgeBuilder);
 
 impl Builder<Edge> for EdgeBuilder {
     fn build(self) -> Option<Edge> {
