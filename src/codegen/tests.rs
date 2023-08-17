@@ -7,11 +7,7 @@ fn test_build_edges() {
                 EdgeKindsBuilder::default()
                     .node(
                         NodeKind::Graph,
-                        Some(
-                            AttributesBuilder::default()
-                                .font_name("Coutier, monospace")
-                                .into(),
-                        ),
+                        AttributesBuilder::default().font_name("Coutier, monospace"),
                     )
                     .build()
                     .unwrap(),
