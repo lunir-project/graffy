@@ -53,6 +53,16 @@ pub enum GraphKind {
     Directed(Graph),
 }
 
+impl GraphKind {
+    fn symbol(&self) -> &'static str {
+        if let Self::Directed(_) = self {
+            "->"
+        } else {
+            "--"
+        }
+    }
+}
+
 /// Get a `Graph` from a `GraphKind` (regardless of the graph's direction)
 impl Into<Graph> for GraphKind {
     fn into(self) -> Graph {
