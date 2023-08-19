@@ -123,7 +123,7 @@ impl Formatter {
         self.buffer
             .push_str(if directed { "digraph" } else { "graph" });
 
-        if let Some(name) = &node.name {
+        if let Some(ref name) = node.name {
             self.buffer.push_str(&format!(" {name}"))
         }
 
@@ -135,11 +135,11 @@ impl Formatter {
         match edge {
             EdgeKind::Node(node) => self.visit_node(node),
             EdgeKind::Edge(expr) => self.visit_edge(expr),
-            EdgeKind::Comment(text) => self.visit_comment(&text),
+            EdgeKind::Comment(ref text) => self.visit_comment(text),
             EdgeKind::SubGraph(body) => {
                 self.buffer.push_str("subgraph");
 
-                if let Some(name) = &body.name {
+                if let Some(ref name) = body.name {
                     self.buffer.push_str(&format!(" {name}"))
                 }
 
@@ -152,21 +152,18 @@ impl Formatter {
     fn visit_edge(&mut self, edge: &Edge) {
         self.visit_node_kind(&edge.left);
 
-        let arrow = if let Some(graph) = &self.current_graph {
-            if matches!(graph, GraphKind::Directed(..)) {
-                "->"
-            } else {
-                "--"
-            }
+        let arrow = if let Some(ref graph) = self.current_graph {
+            graph.symbol()
         } else {
             "->"
         };
 
         self.buffer
-            .push_str(self.pretty_or(&format!(" {arrow} ",), arrow));
+            .push_str(self.pretty_or(&format!(" {arrow} "), arrow));
+
         self.visit_node_kind(&edge.right);
 
-        if let Some(attributes) = edge.attributes.as_ref() {
+        if let Some(ref attributes) = edge.attributes {
             self.visit_attributes(attributes);
         }
     }
@@ -174,7 +171,7 @@ impl Formatter {
     fn visit_node(&mut self, node: &Node) {
         self.visit_node_kind(&node.kind);
 
-        if let Some(attributes) = &node.attributes {
+        if let Some(ref attributes) = node.attributes {
             self.visit_attributes(attributes);
         }
     }
